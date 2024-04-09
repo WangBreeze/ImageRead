@@ -1,0 +1,8 @@
+﻿<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>desktop.png</file>
+        <file>fragmentshader.frag</file>
+        <file>vertexshader.vert</file>
+    </qresource>
+</RCC>
