@@ -19,6 +19,7 @@ set(PROJECT_SOURCES
         qml.qrc
         MyVideo.cpp
         MyVideo.h
+        GL/glut.h
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)

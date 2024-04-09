@@ -85,11 +85,31 @@ Window {
         }
     }
 
+    Text{
+        anchors.top: parent.top
+        anchors.topMargin: 50
+        anchors.right: parent.right
+        anchors.rightMargin: 20
+        color:"red"
+        font.pointSize: 12
+        text: "读取数量:" + myVideoItemId.currentNum + " / " + myVideoItemId.totalNum
+    }
+    Text{
+        anchors.left: parent.left
+        anchors.leftMargin: 10
+        anchors.top: parent.top
+        anchors.topMargin: 50
+        color:"green"
+        font.pointSize: 12
+        font.bold: true
+        text: myVideoItemId.frameRate
+    }
+
     FileDialog{
         id:fileDialogId
         title: "Please choose a file"
         //folder: shortcuts.home
-        folder:"file:///E:/WORKSPACE/ImageRead/Images"
+        folder:"file:///" + "E:/images"
         selectFolder: true
         onAccepted: {
             var strfile = "file:///"

@@ -14,10 +14,13 @@
 #include <QTimer>
 
 
-
+#include "GL/glut.h"
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
 
+//计算帧率
+static int frame=0,stime=0,timebase=0;
+static QString f_frame;
 
 //本文件调用
 QImage cvMat2QImage(const cv::Mat &mat)
@@ -30,10 +33,11 @@ QImage cvMat2QImage(const cv::Mat &mat)
         image = QImage((const unsigned char*)mat.data, mat.cols, mat.rows, mat.step, QImage::Format_Grayscale8);
         break;
     case CV_8UC3:
-        QImage((const unsigned char*)mat.data, mat.cols, mat.rows, mat.step, QImage::Format_RGB888);
-        image = image.rgbSwapped(); // RGB转为BGR
+        image = QImage((const unsigned char*)mat.data, mat.cols, mat.rows, mat.step, QImage::Format_RGB888);
+        image = image.rgbSwapped(); // RGB转为BGR //这里要转一次
         // Qt5.14增加了Format_BGR888
-        //image = QImage((const unsigned char*)mat.data, mat.cols, mat.rows, mat.cols * 3, QImage::Format_BGR888);
+        //image = QImage((const unsigned char*)mat.data,  mat.cols,mat.rows,  mat.step, QImage::Format_BGR888); //这种方式读取显示不成功，待研究：：初步研究是QImage 只是格式容器的创建，而实际数据还是原始数据
+       
         qDebug() << u8"图片格式转换为BRG888";
         break;
     case CV_8UC4:
@@ -75,6 +79,23 @@ cv::Mat QImage2cvMat(const QImage &image)
     }
     return mat;
 }
+
+void ShowFrameRate()
+{
+    char s[100]={0};
+    frame++;
+    stime= glutGet(GLUT_ELAPSED_TIME);
+    if (stime - timebase > 1000) {
+        sprintf(s,"FPS : %4.2f",
+                frame*1000.0/(stime-timebase));
+        timebase = stime;
+        frame = 0;
+        f_frame = s;
+    }
+
+}
+
+
 
 // 数据上下文
 struct Context {
@@ -169,6 +190,8 @@ public:
         shaderProgram.disableAttributeArray(indexTexture);
 
         shaderProgram.release();
+        //获取帧率
+        ShowFrameRate();
     }
 
     // 同步数据
@@ -191,7 +214,7 @@ public:
         texture.create();
         texture.setMinMagFilters(QOpenGLTexture::Linear, QOpenGLTexture::Linear);
         texture.setSize(width,height);
-        texture.setFormat(QOpenGLTexture::RGB8_UNorm);
+        texture.setFormat(QOpenGLTexture::RGB8_UNorm); //无符号8bit
         texture.allocateStorage();
     }
     //
@@ -207,10 +230,12 @@ public:
 MyVideo::MyVideo(QQuickItem *parent) : QQuickFramebufferObject(parent),m_ctx(new Context)
 {
     setMirrorVertically(true);
-    m_currentPlay = 0;
+    setCurrentNum(0);
     setPlaying(false);
+    setFps(0.0);
+    setTotalNum(0);
     m_timer = new QTimer(this);
-    m_timer->setInterval(20);
+    m_timer->setInterval(1);
     connect(m_timer,&QTimer::timeout,this,&MyVideo::timerOut);
 
 }
@@ -237,7 +262,7 @@ bool MyVideo::readImage(QString imagePath, QImage &iamge)
         return false;
     }
     qDebug() << u8"读取图片:" << imagePath;
-    //默认以3通道BGR方式读取
+    //默认以3通道BGR方式读取，因为mat的存储格式默认就是BGR
     cv::Mat image = cv::imread(imagePath.toStdString(),cv::IMREAD_COLOR);
     if (image.empty())
     {
@@ -260,9 +285,9 @@ void MyVideo::newData(const QString &filename)
 
 void MyVideo::newData(const QImage &image)
 {
-    //m_ctx->image = image.convertToFormat(QImage::Format_RGBA8888_Premultiplied);
+    m_ctx->image = image.convertToFormat(QImage::Format_BGR888); //一定要在这里转换
     qDebug() << u8"显示图片";
-    m_ctx->image = image;
+    //m_ctx->image = image;
     update();
 }
 
@@ -282,7 +307,8 @@ void MyVideo::setImageFolder(QString string)
     filters << "*.jpg";
 
     m_fileList =  dir.entryList(filters,QDir::Files);
-    qDebug() << u8"获取的文件有" << m_fileList;
+    setTotalNum(m_fileList.count());
+    //qDebug() << u8"获取的文件有" << m_fileList;
 }
 
 void MyVideo::playStart()
@@ -308,14 +334,14 @@ void MyVideo::playStart()
 
 void MyVideo::timerOut()
 {
-    if (m_currentPlay >= m_fileList.count() - 1)
+    if (m_currentNum >= m_fileList.count() - 1)
     {
         m_timer->stop();
         setPlaying(false);
     }
     else
     {
-        m_currentPlay++;
+        setCurrentNum(m_currentNum+1);
     }
 
     if (showImage() == false)
@@ -323,11 +349,12 @@ void MyVideo::timerOut()
         m_timer->stop();
         setPlaying(false);
     }
+    setFrameRate(f_frame);
 
 }
 bool MyVideo::showImage()
 {
-    QString imagePath = m_openFileFolder + "/" + m_fileList.at(m_currentPlay);
+    QString imagePath = m_openFileFolder + "/" + m_fileList.at(m_currentNum);
     QImage image;
     if (readImage(imagePath,image))
     {
@@ -348,4 +375,56 @@ void MyVideo::setPlaying(bool newPlaying)
         return;
     m_playing = newPlaying;
     emit playingChanged();
+}
+
+int MyVideo::currentNum() const
+{
+    return m_currentNum;
+}
+
+void MyVideo::setCurrentNum(int newCurrentNum)
+{
+    if (m_currentNum == newCurrentNum)
+        return;
+    m_currentNum = newCurrentNum;
+    emit currentNumChanged();
+}
+
+double MyVideo::fps() const
+{
+    return m_fps;
+}
+
+void MyVideo::setFps(double newFps)
+{
+    if (qFuzzyCompare(m_fps, newFps))
+        return;
+    m_fps = newFps;
+    emit fpsChanged();
+}
+
+int MyVideo::totalNum() const
+{
+    return m_totalNum;
+}
+
+void MyVideo::setTotalNum(int newTotalNum)
+{
+    if (m_totalNum == newTotalNum)
+        return;
+    m_totalNum = newTotalNum;
+    emit totalNumChanged();
+}
+
+QString MyVideo::frameRate() const
+{
+    return m_frameRate;
+}
+
+void MyVideo::setFrameRate(const QString &newFrameRate)
+{
+    if (m_frameRate == newFrameRate)
+        return;
+    m_frameRate = newFrameRate;
+    emit frameRateChanged();
 }

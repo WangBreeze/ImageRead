@@ -18,10 +18,16 @@ class MyVideo : public QQuickFramebufferObject
     Q_OBJECT
 public:
     Q_PROPERTY(bool playing READ playing WRITE setPlaying NOTIFY playingChanged)
+    Q_PROPERTY(int  currentNum READ currentNum WRITE setCurrentNum NOTIFY currentNumChanged)
+    Q_PROPERTY(int  totalNum READ totalNum WRITE setTotalNum NOTIFY totalNumChanged)
+    Q_PROPERTY(double fps READ fps WRITE setFps NOTIFY fpsChanged)
+    Q_PROPERTY(QString  frameRate READ frameRate WRITE setFrameRate NOTIFY frameRateChanged)
+
     //开始播放图片
     Q_INVOKABLE void playStart();
     //设置图片路径
     Q_INVOKABLE void setImageFolder(QString string);
+
 
 public:
     explicit MyVideo(QQuickItem *parent = nullptr);
@@ -33,9 +39,29 @@ public:
     bool playing() const;
     void setPlaying(bool newPlaying);
 
+    int currentNum() const;
+    void setCurrentNum(int newCurrentNum);
+
+    double fps() const;
+    void setFps(double newFps);
+
+    int totalNum() const;
+    void setTotalNum(int newTotalNum);
+    void ShowFrameRate(); //帧率计算
+    QString frameRate() const;
+    void setFrameRate(const QString &newFrameRate);
+
 signals:
 
     void playingChanged();
+
+    void currentNumChanged();
+
+    void fpsChanged();
+
+    void totalNumChanged();
+
+    void frameRateChanged();
 
 public slots:
     // 从文件加载图像
@@ -54,6 +80,10 @@ private:
     uint          m_currentPlay;
     QTimer*     m_timer;
     bool m_playing;
+    int m_currentNum;
+    double m_fps;
+    int m_totalNum;
+    QString m_frameRate;
 };
 
 #endif // MYVIDEO_H
