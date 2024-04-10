@@ -169,7 +169,7 @@ public:
     }
     virtual QOpenGLFramebufferObject *createFramebufferObject(const QSize &size) override {
         QOpenGLFramebufferObjectFormat format;
-        format.setSamples(4);
+        format.setSamples(4); //多重采样 4像素取1
         return new QOpenGLFramebufferObject(size,format);
     }
 
