@@ -149,7 +149,6 @@ Window {
         }
     }
     onClosing:{
-
         myVideoItemId.playing = false
     }
 }
