@@ -1,13 +1,3 @@
-<<<<<<< Updated upstream
-﻿<RCC>
-    <qresource prefix="/">
-        <file>main.qml</file>
-        <file>desktop.png</file>
-        <file>fragmentshader.frag</file>
-        <file>vertexshader.vert</file>
-    </qresource>
-</RCC>
-=======
 ﻿<RCC>
     <qresource prefix="/">
         <file>main.qml</file>
@@ -17,4 +7,3 @@
         <file>README.md</file>
     </qresource>
 </RCC>
->>>>>>> Stashed changes
