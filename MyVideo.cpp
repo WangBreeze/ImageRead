@@ -18,8 +18,7 @@
 
 
 
-#include <opencv2/opencv.hpp>
-#include <opencv2/imgproc.hpp>
+
 
 //计算帧率
 static int frame=0,stime=0,timebase=0;
@@ -67,6 +66,7 @@ cv::Mat QImage2cvMat(const QImage &image)
     case QImage::Format_RGB32: // Alpha为FF
     case QImage::Format_ARGB32_Premultiplied:
         mat = cv::Mat(image.height(), image.width(), CV_8UC4, (void*)image.constBits(), image.bytesPerLine());
+        //cv::cvtColor(mat, mat, cv::COLOR_RGB2BGR);
         break;
     case QImage::Format_RGB888: // RR,GG,BB字节顺序存储
         mat = cv::Mat(image.height(), image.width(), CV_8UC3, (void*)image.constBits(), image.bytesPerLine());
@@ -78,10 +78,14 @@ cv::Mat QImage2cvMat(const QImage &image)
         // opencv需要转为BGRA的字节顺序
         cv::cvtColor(mat, mat, cv::COLOR_RGBA2BGRA);
         break;
+    case QImage::Format_BGR888:
+        //mat = cv::Mat(image.height(), image.width(), CV_8UC3, (void*)image.constBits(), image.bytesPerLine());
+        //cv::cvtColor(mat, mat, cv::COLOR_RGB2BGR);
+        break;
     default :
         break;
     }
-    return mat;
+    return mat.clone();
 }
 
 void ShowFrameRate()
@@ -107,8 +111,12 @@ void ShowFrameRate()
 
 // 数据上下文
 struct Context {
-    //cv::Mat   imgMat;
+#if USE_QIMAGE
     QImage image;
+#else
+    cv::Mat imgMat;
+#endif
+
 };
 
 // 顶点矩阵 Vertex matrix
@@ -208,6 +216,7 @@ public:
     void synchronize(QQuickFramebufferObject *item) override{
         MyVideo *obj = static_cast<MyVideo *>(item);
         if(obj){
+#if USE_QIMAGE
             auto img = obj->context()->image;
             if( img.width() != texture.width() || img.height() != texture.height()){
                 // 大小已改变 更新纹理
@@ -216,6 +225,16 @@ public:
             }else{
                 texture.setData(QOpenGLTexture::BGR,QOpenGLTexture::UInt8,img.constBits());
             }
+#else
+            auto img = obj->context()->imgMat;
+            if( img.cols != texture.width() || img.rows != texture.height()){
+                // 大小已改变 更新纹理
+                textureResize(img.cols,img.rows);
+                texture.setData(QOpenGLTexture::BGR,QOpenGLTexture::UInt8,img.data);
+            }else{
+                texture.setData(QOpenGLTexture::BGR,QOpenGLTexture::UInt8,img.data);
+            }
+#endif
         }
     }
     // 重置纹理
@@ -241,10 +260,9 @@ MyVideo::MyVideo(QQuickItem *parent) : QQuickFramebufferObject(parent),m_ctx(new
 {
     setMirrorVertically(true);
     setCurrentNum(0);
-    setFrameSet(2);
+    setFrameSet(500);
     setShowNum(0);
     setPlaying(false);
-    setFps(0.0);
     setTotalNum(0);
 //    m_timer = new QTimer(this);
 //    m_timer->setInterval(20);
@@ -254,6 +272,11 @@ MyVideo::MyVideo(QQuickItem *parent) : QQuickFramebufferObject(parent),m_ctx(new
 
 MyVideo::~MyVideo()
 {
+    if (m_playing)
+    {
+        setPlaying(false);
+        Sleep(10);//等待线程退出
+    }
 
 }
 
@@ -269,19 +292,13 @@ QSharedPointer<Context> MyVideo::context()
 
 bool MyVideo::readImage(QString imagePath, QImage &iamge)
 {
-    if (imagePath.isEmpty())
+    cv::Mat mat;
+    if (readImageMat(imagePath,mat))
     {
-        return false;
+        iamge =  cvMat2QImage(mat);
+        return true;
     }
-    //qDebug() << u8"读取图片:" << imagePath;
-    //默认以3通道BGR方式读取，因为mat的存储格式默认就是BGR
-    cv::Mat image = cv::imread(imagePath.toStdString(),cv::IMREAD_COLOR);
-    if (image.empty())
-    {
-        return false;
-    }
-    iamge =  cvMat2QImage(image);
-    return true;
+    return false;
 }
 
 void MyVideo::readImage()
@@ -305,8 +322,14 @@ void MyVideo::readImage()
             m_readImageWait.wait(&m_imageMutex);
         }
         QString imagePath = m_openFileFolder + "/" + m_fileList.at(currentNum++);
+#if USE_QIMAGE
         QImage image;
         if (readImage(imagePath,image))
+#else
+        cv::Mat image;
+        if (readImageMat(imagePath,image))
+#endif
+
         {
             m_imageQueue.enqueue(image); //加入队列
             qDebug() << u8"加入队列::" << m_imageQueue.count();
@@ -316,6 +339,22 @@ void MyVideo::readImage()
         m_imageMutex.unlock();
     }
     setCurrentNum(currentNum);
+}
+
+bool MyVideo::readImageMat(QString imagePath, cv::Mat &mat)
+{
+    if (imagePath.isEmpty())
+    {
+        return false;
+    }
+    //qDebug() << u8"读取图片:" << imagePath;
+    //默认以3通道BGR方式读取，因为mat的存储格式默认就是BGR
+    mat = cv::imread(imagePath.toStdString(),cv::IMREAD_COLOR);
+    if (mat.empty())
+    {
+        return false;
+    }
+    return true;
 }
 
 
@@ -329,9 +368,24 @@ void MyVideo::newDataPath(const QString &filename)
     }
 }
 
+void MyVideo::newData(cv::Mat &mat)
+{
+#if USE_QIMAGE
+#else
+    m_ctx->imgMat = mat;
+#endif
+    update();
+    setFrameRate(f_frame);
+}
+
 void MyVideo::newData( QImage image)
 {
-    m_ctx->image = image.convertToFormat(QImage::Format_BGR888); //一定要在这里转换
+#if USE_QIMAGE
+   m_ctx->image = image.convertToFormat(QImage::Format_BGR888); //使用QIMage 一定要在这里转换
+#else
+    image = image.convertToFormat(QImage::Format_BGR888);
+    m_ctx->imgMat = QImage2cvMat(image);
+#endif
     //qDebug() << u8"显示图片";
     //m_ctx->image = image;
     update();
@@ -345,15 +399,17 @@ void MyVideo::preImage()
         return;
     }
     QString imagePath = m_openFileFolder + "/" + m_fileList.at(m_currentNum - 1);
+#if USE_QIMAGE
     newDataPath(imagePath);
-//    QImage img;
-//    if (readImage(imagePath,img))
-//    {
-//        newData(img);
-        setCurrentNum(m_currentNum -1);
-        setShowNum(m_currentNum);
-//    }
-
+#else
+    cv::Mat mat;
+    if (readImageMat(imagePath,mat))
+    {
+        newData(mat);
+    }
+#endif
+    setCurrentNum(m_currentNum -1);
+    setShowNum(m_currentNum);
 }
 
 void MyVideo::nextImage()
@@ -363,16 +419,17 @@ void MyVideo::nextImage()
         return;
     }
     QString imagePath = m_openFileFolder + "/" + m_fileList.at(m_currentNum + 1);
+#if USE_QIMAGE
     newDataPath(imagePath);
-
-    //QImage img;
-    //if (readImage(imagePath,img))
-    //{
-    //    newData(img);
-        setCurrentNum(m_currentNum +1);
-        setShowNum(m_currentNum);
-    //}
-
+#else
+    cv::Mat mat;
+    if (readImageMat(imagePath,mat))
+    {
+        newData(mat);
+    }
+#endif
+    setCurrentNum(m_currentNum +1);
+    setShowNum(m_currentNum);
 }
 
 void MyVideo::setImageFolder(QString string)
@@ -468,18 +525,22 @@ bool MyVideo::showImage()
             qDebug() << u8"显示图片等待";
             m_showImageWait.wait(&m_imageMutex);
         }
+#if USE_QIMAGE
         QImage image = m_imageQueue.dequeue();
+#else
+        cv::Mat image = m_imageQueue.dequeue();
+#endif
         m_readImageWait.wakeAll();
         setShowNum(m_showNum+1);
         qDebug() << u8"弹出队列::" << m_imageQueue.count();
+#if USE_QIMAGE
         QMetaObject::invokeMethod(this,"newData",Qt::QueuedConnection,Q_ARG(QImage,image));
+#else
+        QMetaObject::invokeMethod(this,"newData",Qt::QueuedConnection,Q_ARG(cv::Mat,image));
+#endif
 
         m_imageMutex.unlock();
     }
-//    QString imagePath = m_openFileFolder + "/" + m_fileList.at(m_currentNum);
-//    QImage image;
-//    if (readImage(imagePath,image))
-
     return true;
 }
 
@@ -509,18 +570,7 @@ void MyVideo::setCurrentNum(int newCurrentNum)
     emit currentNumChanged();
 }
 
-double MyVideo::fps() const
-{
-    return m_fps;
-}
 
-void MyVideo::setFps(double newFps)
-{
-    if (qFuzzyCompare(m_fps, newFps))
-        return;
-    m_fps = newFps;
-    emit fpsChanged();
-}
 
 int MyVideo::totalNum() const
 {
@@ -575,3 +625,5 @@ void MyVideo::setFrameSet(int newFrameSet)
     m_frameSet = newFrameSet;
     emit frameSetChanged();
 }
+
+Q_DECLARE_METATYPE(cv::Mat)

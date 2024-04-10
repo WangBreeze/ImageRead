@@ -6,7 +6,11 @@
 #include <QImage>
 #include <QWaitCondition>
 #include <QQueue>
+#include <opencv2/opencv.hpp>
+#include <opencv2/imgproc.hpp>
 
+
+#define USE_QIMAGE   1
 /*!
     如何使用？
     内存图像数据直接连接 newData 槽函数即可在 qml 中显示该图像。
@@ -24,7 +28,6 @@ public:
     Q_PROPERTY(int  currentNum READ currentNum WRITE setCurrentNum NOTIFY currentNumChanged)
     Q_PROPERTY(int  showNum READ  showNum WRITE setShowNum NOTIFY  showNumChanged)
     Q_PROPERTY(int  totalNum READ totalNum WRITE setTotalNum NOTIFY totalNumChanged)
-    Q_PROPERTY(double fps READ fps WRITE setFps NOTIFY fpsChanged)
     Q_PROPERTY(QString  frameRate READ frameRate WRITE setFrameRate NOTIFY frameRateChanged)
     Q_PROPERTY(int  frameSet READ frameSet WRITE setFrameSet NOTIFY frameSetChanged)
 
@@ -44,15 +47,13 @@ public:
     //读取图片
     bool readImage(QString imagePath,QImage & iamge);
     void readImage();
+    bool readImageMat(QString imagePath,cv::Mat &mat);
     bool  showImage();
     bool playing() const;
     void setPlaying(bool newPlaying);
 
     int currentNum() const;
     void setCurrentNum(int newCurrentNum);
-
-    double fps() const;
-    void setFps(double newFps);
 
     int totalNum() const;
     void setTotalNum(int newTotalNum);
@@ -86,7 +87,7 @@ public slots:
     // 从文件加载图像
     void newDataPath(const QString &filename);
     // 从内存加载图像
-
+    void newData(cv::Mat &mat);
 
 
 
@@ -94,20 +95,23 @@ public slots:
     void timerOut();
 private:
     QSharedPointer<Context> m_ctx;
-    QString   m_openFileFolder;
-    QStringList  m_fileList;
-    uint          m_currentPlay;
+    QString                 m_openFileFolder;
+    QStringList             m_fileList;
+    uint                    m_currentPlay;
     //QTimer*     m_timer;
-    bool m_playing;
-    int m_currentNum;
-    int m_showNum;
-    double m_fps;
-    int m_totalNum;
-    QString m_frameRate;
+    bool              m_playing;
+    int               m_currentNum;
+    int               m_showNum;
+    int               m_totalNum;
+    QString           m_frameRate;
     QWaitCondition    m_readImageWait;
     QWaitCondition    m_showImageWait;
     QMutex            m_imageMutex;
+#if USE_QIMAGE
     QQueue<QImage>    m_imageQueue;
+#else
+    QQueue<cv::Mat>   m_imageQueue;
+#endif
 
     int m_frameSet;
 };

@@ -148,4 +148,8 @@ Window {
             console.log("Canceled")
         }
     }
+    onClosing:{
+
+        myVideoItemId.playing = false
+    }
 }
