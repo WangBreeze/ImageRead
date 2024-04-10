@@ -40,6 +40,27 @@ Window {
                 myVideoItemId.setImageFolder(text)
             }
         }
+        Text{
+            Layout.leftMargin: 20
+            height:30
+            text:"读取图片时间间隔:"
+            font.pointSize: 12
+        }
+
+        TextField{
+            id: textInputFrameId
+            height:30
+            width:40
+            Layout.preferredWidth:  width
+            Layout.rightMargin: 10
+            font.pointSize: 12
+            enabled:playsStates == false ? true : false
+            text:myVideoItemId.frameSet
+            validator: IntValidator{bottom: 0; top: 2000;}
+            onTextChanged: {
+                myVideoItemId.frameSet = Number(text)
+            }
+        }
     }
 
     MyVideoItem {
@@ -49,7 +70,7 @@ Window {
         anchors.right: parent.right
         anchors.bottom: rowId.top
         Component.onCompleted: {
-            newData(":/desktop.png");
+            newDataPath(":/desktop.png");
         }
     }
 
@@ -63,7 +84,10 @@ Window {
             height:30
             width:60
             text: "上一张"
-            enabled: playsStates == false ? true : false
+            enabled: playsStates == false && myVideoItemId.currentNum > 0? true : false
+            onClicked: {
+                myVideoItemId.preImage()
+            }
 
         }
         Button{
@@ -80,8 +104,10 @@ Window {
             height:30
             width:60
             text: "下一张"
-            enabled:playsStates == false ? true : false
-
+            enabled:playsStates == false && myVideoItemId.totalNum > 0?  true : false
+            onClicked: {
+                myVideoItemId.nextImage()
+            }
         }
     }
 
@@ -92,7 +118,7 @@ Window {
         anchors.rightMargin: 20
         color:"red"
         font.pointSize: 12
-        text: "读取数量:" + myVideoItemId.currentNum + " / " + myVideoItemId.totalNum
+        text: "读取数量:" + myVideoItemId.showNum + " / " + myVideoItemId.totalNum
     }
     Text{
         anchors.left: parent.left
@@ -110,10 +136,11 @@ Window {
         title: "Please choose a file"
         //folder: shortcuts.home
         folder:"file:///" + "E:/images"
-        selectFolder: true
+        selectExisting: true
+        selectFolder: false
         onAccepted: {
             var strfile = "file:///"
-            var fileUrl = fileDialogId.fileUrl.toString()
+            var fileUrl = fileDialogId.folder.toString()
             textInputFloderPathId.text = fileUrl.substring(strfile.length)
             console.log("You chose file  url: " + fileDialogId.fileUrl)
         }
