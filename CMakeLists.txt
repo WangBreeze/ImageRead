@@ -14,6 +14,8 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Quick Concurrent)
 
 find_package(OpenCV REQUIRED)
 
+
+
 set(PROJECT_SOURCES
         main.cpp
         qml.qrc

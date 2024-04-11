@@ -6,6 +6,8 @@
 #include <QImage>
 #include <QWaitCondition>
 #include <QQueue>
+#include <QFuture>
+
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
 
@@ -38,6 +40,7 @@ public:
     Q_INVOKABLE void newData(QImage image);
     Q_INVOKABLE void preImage();
     Q_INVOKABLE void nextImage();
+    Q_INVOKABLE void onClosing();
 
 public:
     explicit MyVideo(QQuickItem *parent = nullptr);
@@ -112,8 +115,9 @@ private:
 #else
     QQueue<cv::Mat>   m_imageQueue;
 #endif
-
-    int m_frameSet;
+    int               m_frameSet;
+    QFuture<void>     m_readResult;
+    QFuture<void>     m_showResult;
 };
 
 #endif // MYVIDEO_H

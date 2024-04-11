@@ -149,6 +149,6 @@ Window {
         }
     }
     onClosing:{
-        myVideoItemId.playing = false
+        myVideoItemId.onClosing()
     }
 }

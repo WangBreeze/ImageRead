@@ -60,21 +60,21 @@ cv::Mat QImage2cvMat(const QImage &image)
     {
     case QImage::Format_Grayscale8: // 灰度图，每个像素点1个字节（8位）
         // Mat构造：行数，列数，存储结构，数据，step每行多少字节
-        mat = cv::Mat(image.height(), image.width(), CV_8UC1, (void*)image.constBits(), image.bytesPerLine());
+        mat = cv::Mat(image.height(), image.width(), CV_8UC1, (void*)image.bits(), image.bytesPerLine());
         break;
     case QImage::Format_ARGB32: // uint32存储0xAARRGGBB，pc一般小端存储低位在前，所以字节顺序就成了BGRA
     case QImage::Format_RGB32: // Alpha为FF
     case QImage::Format_ARGB32_Premultiplied:
-        mat = cv::Mat(image.height(), image.width(), CV_8UC4, (void*)image.constBits(), image.bytesPerLine());
+        mat = cv::Mat(image.height(), image.width(), CV_8UC4, (void*)image.bits(), image.bytesPerLine());
         //cv::cvtColor(mat, mat, cv::COLOR_RGB2BGR);
         break;
     case QImage::Format_RGB888: // RR,GG,BB字节顺序存储
-        mat = cv::Mat(image.height(), image.width(), CV_8UC3, (void*)image.constBits(), image.bytesPerLine());
+        mat = cv::Mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
         // opencv需要转为BGR的字节顺序
         cv::cvtColor(mat, mat, cv::COLOR_RGB2BGR);
         break;
     case QImage::Format_RGBA64: // uint64存储，顺序和Format_ARGB32相反，RGBA
-        mat = cv::Mat(image.height(), image.width(), CV_16UC4, (void*)image.constBits(), image.bytesPerLine());
+        mat = cv::Mat(image.height(), image.width(), CV_16UC4, (void*)image.bits(), image.bytesPerLine());
         // opencv需要转为BGRA的字节顺序
         cv::cvtColor(mat, mat, cv::COLOR_RGBA2BGRA);
         break;
@@ -247,6 +247,26 @@ public:
         texture.allocateStorage();
     }
     //
+public:
+    //创建纹理
+    static GLuint createTexture()
+    {
+        GLuint textureID = 0;
+        // 创建一个纹理对象，并返回一个独一无二的标识保存在textureID中
+        //glGenTextures(1, &textureID);
+        // 绑定textureID标识的纹理，之后的所有操作都是相对于该纹理的
+        //glBindTexture(GL_TEXTURE_2D, textureID);
+        // 设置纹理环绕方式
+        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+        // 设置纹理过滤方式
+        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // 解绑
+        //glBindTexture(GL_TEXTURE_2D, 0);
+        return textureID;
+    }
+public:
     QOpenGLShaderProgram shaderProgram;
     GLint sampler2D = -1;
     GLint projectionMatrix = -1;
@@ -272,11 +292,7 @@ MyVideo::MyVideo(QQuickItem *parent) : QQuickFramebufferObject(parent),m_ctx(new
 
 MyVideo::~MyVideo()
 {
-    if (m_playing)
-    {
-        setPlaying(false);
-        Sleep(10);//等待线程退出
-    }
+    
 
 }
 
@@ -432,6 +448,27 @@ void MyVideo::nextImage()
     setShowNum(m_currentNum);
 }
 
+void MyVideo::onClosing()
+{
+    if (m_playing)
+    {
+        setPlaying(false);
+    }
+    Sleep(10);//等待
+    if (m_showResult.isPaused() || m_showResult.isRunning())
+    {
+        m_showImageWait.wakeAll();
+        m_showResult.waitForFinished();
+    }
+    if (m_readResult.isPaused() || m_readResult.isRunning())
+    {
+        m_readImageWait.wakeAll();
+        m_readResult.waitForFinished();
+    }
+
+    qDebug() << u8"程序退出";
+}
+
 void MyVideo::setImageFolder(QString string)
 {
     m_openFileFolder = string;
@@ -470,8 +507,8 @@ void MyVideo::playStart()
     }
 
     //启动多线程
-    QtConcurrent::run(this,&MyVideo::readImage);
-    QtConcurrent::run(this,&MyVideo::showImage);
+    m_readResult = QtConcurrent::run(this,&MyVideo::readImage);
+    m_showResult = QtConcurrent::run(this,&MyVideo::showImage);
 //    if (m_timer->isActive())
 //    {
 //        m_timer->stop();
